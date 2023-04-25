@@ -67,6 +67,7 @@ Commands and responses:
 			15	Static Address
 			16	Secure Connections Only
 			17	Extended Advertising
+			18	Periodic Advertising
 
 		In case of an error, the error response will be returned.
 
@@ -510,6 +511,81 @@ Commands and responses:
 
 		In case of an error, the error response will be returned.
 
+	Opcode 0x22 - Start Periodic Advertising command/response
+
+		Controller Index:	<controller id>
+		Command parameters:	Flags (1 octet)
+					Adv_Data_len (2 octets)
+					Adv_Data (Variable)
+		Response Parameters:	Current_Settings (4 Octets)
+
+		Possible values for the Flags parameter are a bit-wise or
+		of the following bits:
+					0 = Include TX power
+
+		This command is used to start Periodic Advertising.
+
+		In case of an error, the error response will be returned.
+
+	Opcode 0x23 - Stop Periodic Advertising command/response
+
+		Controller Index:	<controller id>
+		Command parameters:	<none>
+		Response Parameters:	Current_Settings (4 Octets)
+
+		This command is used to stop Periodic Advertising.
+
+		In case of an error, the error response will be returned.
+
+	Opcode 0x24 - Create Periodic Advertising Sync command/response
+
+		Controller Index:	<controller id>
+		Command parameters:	Address_Type (1 octet)
+					Address (6 octets)
+					Advertiser Set ID (1 octet)
+					Skip (2 octets)
+					Synchronization Timeout (2 octets)
+					Flags (1 octet)
+		Return Parameters:	<none>
+
+		Possible values for the Flags parameter are a bit-wise or
+		of the following bits:
+					0 = Reports disabled
+
+		This command is used to perform Synchronization procedure with
+		periodic advertiser.
+
+		In case of an error, the error response will be returned.
+
+	Opcode 0x25 - Transfer Periodic Advertising command/response
+
+		Controller Index:	<controller id>
+		Command parameters:	Address_Type (1 octet)
+					Address (6 octets)
+					Service Data (2 octet)
+					Flags (1 octet)
+		Return Parameters:	<none>
+
+		Possible values for the Flags parameter are a bit-wise or
+		of the following bits:
+					0 = PA Sync Transfer
+					1 = PA Info Transfer
+
+		This command is used to perform Advertising Transfer procedure
+		to peer device.
+
+		In case of an error, the error response will be returned.
+
+	Opcode 0x26 - Terminate Periodic Advertising Sync command/response
+
+		Controller Index:	<controller id>
+		Command parameters:	Sync Handle (2 octet)
+		Return Parameters:	<none>
+
+		This command is used to terminate existing Periodic Sync.
+
+		In case of an error, the error response will be returned.
+
 Events:
 	Opcode 0x80 - New Settings event
 
@@ -635,7 +711,7 @@ Events:
 
 		Controller Index:	<controller id>
 		Event parameters:	Address_Type (1 octet)
-							Address (6 octets)
+					Address (6 octets)
 
 		This event can be sent when IUT lost a bond with a peer device.
 
@@ -643,9 +719,45 @@ Events:
 
 		Controller Index:	<controller id>
 		Event parameters:	Address_Type (1 octet)
-							Address (6 octets)
-							Reason (1 octet)
+					Address (6 octets)
+					Reason (1 octet)
 
 		This event can be sent when IUT pairing procedure fails with
 		specified reason.
 
+	Opcode 0x8d - Periodic Sync Established event
+
+		Controller Index:	<controller id>
+		Event parameters:	Sync Handle (2 octets)
+					Address_Type (1 octet)
+					Address (6 octets)
+					Status (1 octet)
+
+		This event can be sent when established sync with Periodic
+		Advertiser.
+
+	Opcode 0x8e - Periodic Sync Lost event
+
+		Controller Index:	<controller id>
+		Event parameters:	Sync Handle (2 octet)
+					Reason (1 octets)
+
+		This event can be sent when lost sync with Periodic Advertiser.
+
+	Opcode 0x8f - Periodic Advertising Report event
+
+		Controller Index:	<controller id>
+		Event parameters:	Sync Handle (2 octet)
+					TX Power (1 octet)
+					RSSI (1 octet)
+					Flags (1 octet)
+					Data_Length (2 octets)
+					Data (0-1650 Octets)
+
+		Possible values for the Flags parameter are a bit-wise or
+		of the following bits:
+					0 = Data Incomplete (more to come)
+					1 = Data truncated (no more to come)
+
+		This event can be sent after IUT received Periodic Advertising
+		report on established sync.

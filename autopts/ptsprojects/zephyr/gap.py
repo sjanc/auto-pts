@@ -135,6 +135,7 @@ def set_pixits(ptses):
     pts.set_pixit("GAP", "TSPX_encryption_before_service_request", "FALSE")
     pts.set_pixit("GAP", "TSPX_tester_appearance", "0000")
     pts.set_pixit("GAP", "TSPX_advertising_data", "")
+    pts.set_pixit("GAP", "TSPX_periodic_advertising_data", "")
     pts.set_pixit("GAP", "TSPX_iut_device_IRK_for_resolvable_privacy_address_generation_procedure",
                   "00000000000000000000000000000000")
     pts.set_pixit("GAP", "TSPX_tester_device_IRK_for_resolvable_privacy_address_generation_procedure",
@@ -166,13 +167,23 @@ def test_cases(ptses):
     ad_str_name_len = format((len(ad_str_name) // 2), 'x').zfill(2)
     ad_pixit = ad_str_flags_len + ad_str_flags + ad_str_name_len + ad_str_name
 
+    padv_name = iut_device_name + '_PADV'.encode('utf-8')
+    padv_str_name = str(AdType.name_full).zfill(2) + bytes.hex(padv_name)
+    padv_str_name_len = format((len(padv_str_name) // 2), 'x').zfill(2)
+    padv_pixit = padv_str_name_len + padv_str_name
+
+    gap_padv_data = bytearray()
+    gap_padv_data.extend(bytes([AdType.name_full]))
+    gap_padv_data.extend(chr(len(padv_name)).encode())
+    gap_padv_data.extend(padv_name)
+
     stack = get_stack()
 
     pre_conditions = [
         TestFunc(btp.core_reg_svc_gap),
         TestFunc(stack.gap_init, iut_device_name,
                  iut_manufacturer_data, iut_appearance, iut_svc_data, iut_flags,
-                 iut_svcs, iut_uri),
+                 iut_svcs, iut_uri, gap_padv_data),
         TestFunc(btp.gap_read_ctrl_info),
         TestFunc(lambda: pts.update_pixit_param(
             "GAP", "TSPX_bd_addr_iut",
@@ -192,6 +203,8 @@ def test_cases(ptses):
             "GAP", "TSPX_iut_device_name_in_adv_packet_for_random_address", iut_device_name)),
         TestFunc(lambda: pts.update_pixit_param(
             "GAP", "TSPX_advertising_data", ad_pixit)),
+        TestFunc(lambda: pts.update_pixit_param(
+            "GAP", "TSPX_periodic_advertising_data", padv_pixit)),
         TestFunc(lambda: pts.update_pixit_param(
             "GAP", "TSPX_delete_ltk", "TRUE")),
         TestFunc(lambda: pts.update_pixit_param(

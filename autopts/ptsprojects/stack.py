@@ -122,7 +122,7 @@ class ConnParams:
 
 class Gap:
     def __init__(self, name, manufacturer_data, appearance, svc_data, flags,
-                 svcs, uri=None):
+                 svcs, uri=None, padv_data=None):
 
         self.ad = {}
         self.sd = {}
@@ -143,6 +143,7 @@ class Gap:
         self.flags = flags
         self.svcs = svcs
         self.uri = uri
+        self.padv_data = padv_data
         self.oob_legacy = "0000000000000000FE12036E5A889F4D"
 
         # If disconnected - None
@@ -215,6 +216,44 @@ class Gap:
         while flag.is_set():
             if not self.is_connected(0):
                 t.cancel()
+                return True
+
+        return False
+
+
+    def wait_padv_report(self, timeout):
+        if self.padv_report_rxed:
+            return True
+
+        flag = Event()
+        flag.set()
+
+        t = Timer(timeout, timeout_cb, [flag])
+        t.start()
+
+        while flag.is_set():
+            if self.padv_report_rxed:
+                t.cancel()
+                self.padv_report_rxed = False
+                return True
+
+        return False
+
+
+    def wait_padv_sync_established(self, timeout):
+        if self.padv_sync_established:
+            return True
+
+        flag = Event()
+        flag.set()
+
+        t = Timer(timeout, timeout_cb, [flag])
+        t.start()
+
+        while flag.is_set():
+            if self.padv_sync_established:
+                t.cancel()
+                self.padv_sync_established = False
                 return True
 
         return False
@@ -1285,9 +1324,9 @@ class Stack:
         return self.supported_svcs & services[svc] > 0
 
     def gap_init(self, name=None, manufacturer_data=None, appearance=None,
-                 svc_data=None, flags=None, svcs=None, uri=None):
+                 svc_data=None, flags=None, svcs=None, uri=None, padv_data=None):
         self.gap = Gap(name, manufacturer_data, appearance, svc_data, flags,
-                       svcs, uri)
+                       svcs, uri, padv_data)
 
     def mesh_init(self, uuid, uuid_lt2=None):
         if self.mesh:

@@ -112,6 +112,14 @@ GAP = {
                                   defs.GAP_SET_EXTENDED_ADVERTISING, CONTROLLER_INDEX, 1),
     "set_extend_advertising_off": (defs.BTP_SERVICE_ID_GAP,
                                    defs.GAP_SET_EXTENDED_ADVERTISING, CONTROLLER_INDEX, 0),
+    "padv_start": (defs.BTP_SERVICE_ID_GAP,
+                   defs.GAP_PADV_START, CONTROLLER_INDEX),
+    "padv_stop": (defs.BTP_SERVICE_ID_GAP,
+                  defs.GAP_PADV_STOP, CONTROLLER_INDEX),
+    "padv_create_sync": (defs.BTP_SERVICE_ID_GAP,
+                         defs.GAP_PADV_CREATE_SYNC, CONTROLLER_INDEX),
+    "padv_transfer": (defs.BTP_SERVICE_ID_GAP,
+                      defs.GAP_PADV_TRANSFER, CONTROLLER_INDEX),
 }
 
 
@@ -325,6 +333,36 @@ def gap_passkey_entry_req_ev_(gap, data, data_len):
     gap.passkey.data = randint(0, 999999)
 
 
+def gap_padv_sync_established_ev_(gap, data, data_len):
+    logging.debug("%s", gap_padv_sync_established_ev_.__name__)
+
+    fmt = '<HB6sB'
+
+    if len(data) != struct.calcsize(fmt):
+        raise BTPError("Invalid data length")
+
+    # Unpack and swap address
+    _handle, _addr_type, _addr, _status = struct.unpack_from(fmt, data)
+    _addr = binascii.hexlify(_addr[::-1]).lower().decode('utf-8')
+
+    logging.debug("received %r %d", (_addr_type, _addr), _status)
+    if _status != 0:
+        return
+
+    stack = get_stack()
+    stack.gap.padv_sync_established = True
+
+
+def gap_padv_lost_ev_(gap, data, data_len):
+    logging.debug("%s", gap_padv_lost_ev_.__name__)
+
+
+def gap_padv_sync_report_ev_(gap, data, data_len):
+    logging.debug("%s", gap_padv_sync_report_ev_.__name__)
+    stack = get_stack()
+    stack.gap.padv_report_rxed = True
+
+
 GAP_EV = {
     defs.GAP_EV_NEW_SETTINGS: gap_new_settings_ev_,
     defs.GAP_EV_DEVICE_FOUND: gap_device_found_ev_,
@@ -339,6 +377,9 @@ GAP_EV = {
     defs.GAP_EV_PAIRING_CONSENT_REQ: gap_pairing_consent_ev_,
     defs.GAP_EV_PAIRING_FAILED: gap_pairing_failed_ev_,
     defs.GAP_EV_BOND_LOST: gap_bond_lost_ev_,
+    defs.GAP_EV_PADV_SYNC_ESTABLISHED: gap_padv_sync_established_ev_,
+    defs.GAP_EV_PADV_SYNC_LOST: gap_padv_lost_ev_,
+    defs.GAP_EV_PADV_REPORT: gap_padv_sync_report_ev_,
 }
 
 
@@ -1166,6 +1207,92 @@ def gap_set_extended_advertising_off():
 
     tuple_data = gap_command_rsp_succ()
     __gap_current_settings_update(tuple_data)
+
+
+def padv_start(data=None, tx_power=False):
+    """GAP Start Periodic Advertising Function.
+    """
+    logging.debug("%s", padv_start.__name__)
+
+    flags = 0
+
+    if tx_power:
+        flags |= defs.GAP_PADV_START_FLAG_TX_POWER
+
+    if data is None:
+        data = ""
+
+    if isinstance(data, str):
+        data = data.encode()
+
+    data_ba = bytearray(struct.pack("<BH%ds" % len(data), flags, len(data), data))
+
+    iutctl = get_iut()
+    iutctl.btp_socket.send(*GAP['padv_start'], data=data_ba)
+
+    tuple_data = gap_command_rsp_succ()
+    __gap_current_settings_update(tuple_data)
+
+    gap_command_rsp_succ()
+
+
+def padv_stop():
+    """GAP Stop Periodic Advertising Function.
+    """
+    logging.debug("%s", padv_stop.__name__)
+
+    iutctl = get_iut()
+
+    iutctl.btp_socket.send(*GAP['padv_stop'])
+
+    tuple_data = gap_command_rsp_succ()
+    __gap_current_settings_update(tuple_data)
+
+
+def gap_padv_create_sync(adv_sid, skip, sync_to, reports_disabled, addr_type=None, addr=None):
+    logging.debug("%s", gap_padv_create_sync.__name__)
+
+    if not addr_type or not addr:
+        addr_type = pts_addr_type_get(None)
+        addr = addr2btp_ba(pts_addr_get(None))
+
+    flags = 0
+
+    if reports_disabled:
+        flags |= defs.GAP_PADV_CREATE_SYNC_FLAG_REPORTS_DISABLED
+
+    data_ba = bytearray(struct.pack("<B6s", addr_type, addr))
+    data_ba.extend(bytearray(struct.pack("<BHHB", adv_sid, skip,
+                                         sync_to, flags)))
+
+    iutctl = get_iut()
+    iutctl.btp_socket.send(*GAP['padv_create_sync'], data=data_ba)
+
+    gap_command_rsp_succ()
+
+
+def padv_transfer(service_data, pa_sync=True, pa_info=True, addr_type=None, addr=None):
+    logging.debug("%s", padv_transfer.__name__)
+
+    if not addr_type or not addr:
+        addr_type = pts_addr_type_get(None)
+        addr = addr2btp_ba(pts_addr_get(None))
+
+    flags = 0
+
+    if pa_sync:
+        flags |= defs.GAP_PADV_TRANSFER_FLAG_PA_SYNC
+
+    if pa_info:
+        flags |= defs.GAP_PADV_TRANSFER_FLAG_PA_INFO
+
+    data_ba = bytearray(struct.pack("<B6s", addr_type, addr))
+    data_ba.extend(bytearray(struct.pack("<HB", service_data, flags)))
+
+    iutctl = get_iut()
+    iutctl.btp_socket.send(*GAP['padv_transfer'], data=data_ba)
+
+    gap_command_rsp_succ()
 
 
 def parse_eir_data(eir):

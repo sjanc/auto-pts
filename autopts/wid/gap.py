@@ -24,6 +24,7 @@ from autopts.pybtp import types
 from autopts.pybtp import btp
 from autopts.pybtp.types import Prop, Perm, UUID, AdType, bdaddr_reverse, WIDParams, IOCap, OwnAddrType
 from autopts.wid import generic_wid_hdl
+from autopts.wid.bap import create_lc3_ltvs_bytes
 
 log = logging.debug
 
@@ -1346,6 +1347,39 @@ def hdl_wid_309(_: WIDParams):
     # information.
     stack = get_stack()
     return stack.gap.wait_periodic_transfer_received(10)
+
+def hdl_wid_357(_: WIDParams):
+    stack = get_stack()
+
+    stack.bap_init()
+
+    coding_format = 0xff
+    vid = 0xffff
+    cid = 0xffff
+    qos_config = (7500, 0x00, 26, 2, 8)
+    sampling_freq = 0x01
+    frame_duration = 0x00
+    octets_per_frame = 26
+    audio_locations = 0x01
+    frames_per_sdu = 0x01
+
+    codec_ltvs_bytes = create_lc3_ltvs_bytes(sampling_freq, frame_duration,
+                                             audio_locations, octets_per_frame,
+                                             frames_per_sdu)
+    streams_per_subgroup = 1
+    presentation_delay = 40000
+    subgroups = 1
+    broadcast_id = btp.bap_broadcast_source_setup(streams_per_subgroup, subgroups, coding_format,
+                                                  vid, cid, codec_ltvs_bytes, *qos_config,
+                                                  presentation_delay)
+
+    stack.bap.broadcast_id = broadcast_id
+
+    btp.bap_broadcast_adv_start(broadcast_id)
+
+    btp.bap_broadcast_source_start(broadcast_id)
+
+    return True
 
 def hdl_wid_400(_: WIDParams):
     btp.set_filter_accept_list()

@@ -50,7 +50,7 @@ import win32com.server.connect
 import win32com.server.util
 
 from autopts.ptsprojects import ptstypes
-from autopts.ptsprojects.ptstypes import E_FATAL_ERROR
+from autopts.ptsprojects.ptstypes import E_FATAL_ERROR, MMI_Style_Ok_Cancel2
 from autopts.utils import PTS_WORKSPACE_FILE_EXT, ResultWithFlag, count_script_instances, get_own_workspaces
 from autopts.winutils import get_pid_by_window_title, kill_all_processes
 
@@ -266,9 +266,18 @@ class PTSSender(win32com.server.connect.ConnectableServer):
 
                 # Don't block xml-rpc
                 if result == "WAIT":
-                    def wait_until():
-                        logger.debug(f"Waiting for response from callback.on_implicit_send, wid {wid}")
-                        return not self._end
+                    """
+                    When ImplicitSendStyle() is called with style MMI_Style_Ok_Cancel2,
+                    implementation may signal the IUT the requested action after the message tag is
+                    identified but it should not block in the function.Otherwise, it may block PTS
+                    from progressing.Implementation should always return “OK”.
+                    """
+                    if style == MMI_Style_Ok_Cancel2:
+                        result = "OK"
+                    else:
+                        def wait_until():
+                            logger.debug(f"Waiting for response from callback.on_implicit_send, wid {wid}")
+                            return not self._end
 
                     # TODO make this timeout configurable from config
                     result = self._response.get(timeout=900, predicate=wait_until)
